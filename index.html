@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Swarm ⇄ Swarm II Macro Converter</title>
+<style>
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0f; --surface: #12121a; --border: #2a2a3f;
+    --accent: #7c5cfc; --accent2: #00e5c3; --text: #e8e8f0;
+    --muted: #6b6b8a; --error: #ff4d6a; --success: #00e5a0; --warn: #ffb347;
+  }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; min-height: 100vh; overflow-x: hidden; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(124,92,252,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(124,92,252,0.04) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+  .container { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 40px 24px 80px; }
+  .header { text-align: center; margin-bottom: 48px; animation: fadeDown 0.6s ease both; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(124,92,252,0.12); border: 1px solid rgba(124,92,252,0.3);
+    border-radius: 100px; padding: 6px 16px; font-size: 11px;
+    font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace; letter-spacing: 0.15em;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 20px;
+  }
+  h1 { font-size: clamp(32px,5vw,52px); font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; margin-bottom: 12px; }
+  h1 span.old { color: var(--muted); }
+  h1 span.arrow { color: var(--accent); margin: 0 16px; }
+  h1 span.new { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .subtitle { color: var(--muted); font-size: 16px; max-width: 520px; margin: 0 auto; line-height: 1.6; }
+  .format-cards { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; margin-bottom: 32px; animation: fadeUp 0.6s 0.1s ease both; }
+  .format-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .format-card h3 { font-size: 12px; font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; }
+  .format-fields { display: flex; flex-direction: column; gap: 6px; }
+  .field-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .field-key { font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace; color: var(--accent); font-size: 11px; background: rgba(124,92,252,0.1); padding: 2px 8px; border-radius: 4px; min-width: 110px; }
+  .field-key.same { color: var(--success); background: rgba(0,229,160,0.1); }
+  .field-val { color: var(--muted); font-size: 12px; }
+  .arrow-icon { font-size: 28px; color: var(--accent); text-align: center; }
+  .drop-section { animation: fadeUp 0.6s 0.2s ease both; margin-bottom: 32px; }
+  .section-title { font-size: 12px; font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 14px; display: flex; align-items: center; gap: 12px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .drop-zone { border: 2px dashed var(--border); border-radius: 16px; padding: 56px 40px; text-align: center; cursor: pointer; transition: all 0.3s ease; background: var(--surface); }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: rgba(124,92,252,0.06); transform: scale(1.01); }
+  .drop-icon { width: 64px; height: 64px; margin: 0 auto 20px; background: rgba(124,92,252,0.12); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+  .drop-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .drop-sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  #fileInput { display: none; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; border: none; transition: all 0.2s ease; letter-spacing: 0.02em; text-decoration: none; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #9070ff; transform: translateY(-1px); }
+  .btn-success { background: var(--success); color: #0a0f0a; }
+  .btn-success:hover { background: #00ffb8; transform: translateY(-1px); }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 8px 16px; font-size: 12px; }
+  .info-box { background: rgba(0,229,195,0.06); border: 1px solid rgba(0,229,195,0.2); border-radius: 12px; padding: 20px 24px; margin-bottom: 40px; animation: fadeUp 0.6s 0.3s ease both; }
+  .info-box h4 { color: var(--accent2); font-size: 12px; font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+  .info-box ul { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+  .info-box li { font-size: 13px; color: #7ab8ae; display: flex; gap: 12px; align-items: flex-start; line-height: 1.6; }
+  .info-box li::before { content: '→'; color: var(--accent2); flex-shrink: 0; font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace; margin-top: 1px; }
+  .info-box li strong { color: #a8d8d2; font-weight: 700; }
+  .info-box li code { background: rgba(0,229,195,0.1); padding: 1px 5px; border-radius: 3px; font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace; font-size: 12px; vertical-align: baseline; }
+  .results-section { display: none; animation: fadeUp 0.5s ease both; }
+  .results-section.visible { display: block; }
+  .stats-bar { display: flex; gap: 1px; background: var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 32px; border: 1px solid var(--border); }
+  .stat { flex: 1; background: var(--surface); padding: 20px; text-align: center; }
+  .stat-num { font-size: 32px; font-weight: 800; font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace; color: var(--accent); display: block; line-height: 1; margin-bottom: 4px; }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  .macro-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 32px; max-height: 560px; overflow-y: auto; padding-right: 4px; }
+  .macro-list::-webkit-scrollbar { width: 4px; }
+  .macro-list::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+  .macro-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; display: flex; align-items: flex-start; gap: 14px; transition: border-color 0.2s; }
+  .macro-card:hover { border-color: rgba(124,92,252,0.4); }
+  .macro-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 6px; }
+  .dot-ok { background: var(--success); box-shadow: 0 0 8px var(--success); }
+  .dot-warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+  .macro-info { flex: 1; min-width: 0; }
+  .macro-name { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px; }
+  .macro-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .meta-tag { font-size: 11px; font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace; padding: 2px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--muted); }
+  .meta-tag.hl { background: rgba(124,92,252,0.12); color: var(--accent); }
+  .meta-tag.wn { color: var(--warn); }
+  .macro-events { font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace; font-size: 11px; border-left: 2px solid var(--border); padding-left: 12px; display: flex; flex-direction: column; gap: 2px; color: var(--muted); }
+  .ev-press { color: #7ee8a2; } .ev-release { color: #ff9e6a; }
+  .warnings-panel { background: rgba(255,179,71,0.06); border: 1px solid rgba(255,179,71,0.25); border-radius: 12px; padding: 20px; margin-bottom: 32px; display: none; }
+  .warnings-panel.visible { display: block; }
+  .warnings-panel h4 { color: var(--warn); font-size: 12px; font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; }
+  .warn-item { font-size: 13px; color: #c9a060; padding: 5px 0; border-bottom: 1px solid rgba(255,179,71,0.1); display: flex; gap: 8px; }
+  .warn-item:last-child { border-bottom: none; }
+  .actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .error-panel { background: rgba(255,77,106,0.08); border: 1px solid rgba(255,77,106,0.3); border-radius: 12px; padding: 20px 24px; display: none; margin-bottom: 24px; }
+  .error-panel.visible { display: block; }
+  .error-panel h4 { color: var(--error); font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .error-msg { font-size: 13px; color: #c9606e; font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace; white-space: pre-wrap; }
+  @keyframes fadeDown { from { opacity:0; transform:translateY(-20px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+  .info-box li code, .info-box li strong { vertical-align: baseline; }
+  code { vertical-align: baseline; font-size: inherit; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace; padding-top: 40px; border-top: 1px solid var(--border); margin-top: 60px; }
+  .dir-toggle { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 40px; animation: fadeUp 0.6s 0.05s ease both; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; width: fit-content; margin-left: auto; margin-right: auto; }
+  .dir-btn { padding: 12px 28px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; background: var(--surface); color: var(--muted); transition: all 0.2s ease; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; }
+  .dir-btn.active { background: var(--accent); color: white; }
+  .dir-btn:first-child { border-right: 1px solid var(--border); }
+  .dir-sep { padding: 12px 4px; background: var(--surface); color: var(--muted); font-size: 16px; border-right: 1px solid var(--border); pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="header">
+    <div class="badge">⚡ Native Binary Conversion</div>
+    <h1><span class="old">Swarm</span><span class="arrow">⇄</span><span class="new">Swarm II</span></h1>
+    <p class="subtitle">Bidirectional converter between Roccat Swarm and Turtle Beach Swarm II macro <code>.dat</code> files.</p>
+  </header>
+
+  <div class="dir-toggle">
+    <button class="dir-btn active" id="btnTo2" onclick="setDir('to2')">Swarm 1 → Swarm II</button>
+    <button class="dir-btn" id="btnTo1" onclick="setDir('to1')">Swarm II → Swarm 1</button>
+  </div>
+
+  <div class="format-cards">
+    <div class="format-card">
+      <h3>Both formats: ROCCAT01 binary</h3>
+      <div class="format-fields">
+        <div class="field-row"><span class="field-key same">ROCCAT01</span><span class="field-val">shared magic header</span></div>
+        <div class="field-row"><span class="field-key same">0x40 0x57 0x01</span><span class="field-val">per-macro marker</span></div>
+        <div class="field-row"><span class="field-key same">HID scan codes</span><span class="field-val">USB keyboard codes</span></div>
+        <div class="field-row"><span class="field-key same">8 bytes/event</span><span class="field-val">kc + dir + pad + delay</span></div>
+        <div class="field-row"><span class="field-key same">80-byte name field</span><span class="field-val">fixed, null-padded</span></div>
+      </div>
+    </div>
+    <div class="arrow-icon">⇄</div>
+    <div class="format-card">
+      <h3>What the converter does</h3>
+      <div class="format-fields">
+        <div class="field-row"><span class="field-key">reads any</span><span class="field-val">ROCCAT01 .dat file</span></div>
+        <div class="field-row"><span class="field-key">re-packs</span><span class="field-val">clean binary output</span></div>
+        <div class="field-row"><span class="field-key">preserves</span><span class="field-val">all events &amp; timing</span></div>
+        <div class="field-row"><span class="field-key">output</span><span class="field-val">.dat (importable)</span></div>
+        <div class="field-row"><span class="field-key">no JSON</span><span class="field-val">native binary only</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box" id="infoBox">
+    <h4 id="infoTitle">Swarm 1 → Swarm II</h4>
+    <ul id="infoSteps">
+      <li>In Roccat Swarm → Macro Manager → <strong>check mark</strong> a folder or macro → click the <strong>Share icon</strong> (Share Selected Macros) → save the <code>.dat</code></li>
+      <li>Drop the file below — all macros are converted at once</li>
+      <li>In Turtle Beach Swarm II → Macro Manager → <strong>Import</strong> → select the converted <code>.dat</code></li>
+    </ul>
+  </div>
+
+  <div class="drop-section">
+    <div class="section-title">Input</div>
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-icon">📂</div>
+      <div class="drop-title" id="dropTitle">Drop your Roccat Swarm export here</div>
+      <div class="drop-sub" id="dropSub">Roccat Swarm 1 binary <strong>.dat</strong> file</div>
+      <label class="btn btn-primary" for="fileInput">Browse file…</label>
+      <input type="file" id="fileInput" accept=".dat">
+    </div>
+  </div>
+
+  <div class="error-panel" id="errorPanel"><h4>⚠ Error</h4><div class="error-msg" id="errorMsg"></div></div>
+
+  <div class="results-section" id="results">
+    <div class="stats-bar">
+      <div class="stat"><span class="stat-num" id="statMacros">0</span><span class="stat-label">Macros</span></div>
+      <div class="stat"><span class="stat-num" id="statEvents">0</span><span class="stat-label">Total Events</span></div>
+      <div class="stat"><span class="stat-num" id="statWarns">0</span><span class="stat-label">Warnings</span></div>
+      <div class="stat"><span class="stat-num" style="color:var(--success)">✓</span><span class="stat-label">Ready</span></div>
+    </div>
+    <div class="section-title">Converted Macros</div>
+    <div class="macro-list" id="macroList"></div>
+    <div class="warnings-panel" id="warningsPanel"><h4>⚠ Warnings</h4><div id="warnList"></div></div>
+    <div class="actions">
+      <button class="btn btn-success" id="downloadBtn" onclick="downloadDat()">⬇ Download converted .dat</button>
+      <button class="btn btn-ghost" onclick="resetConverter()">← Convert another file</button>
+    </div>
+  </div>
+
+</div>
+<footer>Swarm ⇄ Swarm II Converter · ROCCAT01 binary format reverse-engineered from real export files</footer>
+
+<script>
+// ── HID USB Keycode ↔ Web KeyboardEvent.code ──────────────────────────────
+const HID_TO_CODE = {
+  0x04:'KeyA',  0x05:'KeyB',  0x06:'KeyC',  0x07:'KeyD',  0x08:'KeyE',
+  0x09:'KeyF',  0x0a:'KeyG',  0x0b:'KeyH',  0x0c:'KeyI',  0x0d:'KeyJ',
+  0x0e:'KeyK',  0x0f:'KeyL',  0x10:'KeyM',  0x11:'KeyN',  0x12:'KeyO',
+  0x13:'KeyP',  0x14:'KeyQ',  0x15:'KeyR',  0x16:'KeyS',  0x17:'KeyT',
+  0x18:'KeyU',  0x19:'KeyV',  0x1a:'KeyW',  0x1b:'KeyX',  0x1c:'KeyY',
+  0x1d:'KeyZ',
+  0x1e:'Digit1',0x1f:'Digit2',0x20:'Digit3',0x21:'Digit4',0x22:'Digit5',
+  0x23:'Digit6',0x24:'Digit7',0x25:'Digit8',0x26:'Digit9',0x27:'Digit0',
+  0x28:'Enter',0x29:'Escape',0x2a:'Backspace',0x2b:'Tab',0x2c:'Space',
+  0x2d:'Minus',0x2e:'Equal',0x2f:'BracketLeft',0x30:'BracketRight',
+  0x31:'Backslash',0x33:'Semicolon',0x34:'Quote',0x35:'Backquote',
+  0x36:'Comma',0x37:'Period',0x38:'Slash',0x39:'CapsLock',
+  0x3a:'F1',0x3b:'F2',0x3c:'F3',0x3d:'F4',0x3e:'F5',0x3f:'F6',
+  0x40:'F7',0x41:'F8',0x42:'F9',0x43:'F10',0x44:'F11',0x45:'F12',
+  0x46:'PrintScreen',0x47:'ScrollLock',0x48:'Pause',
+  0x49:'Insert',0x4a:'Home',0x4b:'PageUp',
+  0x4c:'Delete',0x4d:'End',0x4e:'PageDown',
+  0x4f:'ArrowRight',0x50:'ArrowLeft',0x51:'ArrowDown',0x52:'ArrowUp',
+  0x53:'NumLock',
+  0x54:'NumpadDivide',0x55:'NumpadMultiply',0x56:'NumpadSubtract',
+  0x57:'NumpadAdd',0x58:'NumpadEnter',
+  0x59:'Numpad1',0x5a:'Numpad2',0x5b:'Numpad3',0x5c:'Numpad4',
+  0x5d:'Numpad5',0x5e:'Numpad6',0x5f:'Numpad7',0x60:'Numpad8',
+  0x61:'Numpad9',0x62:'Numpad0',0x63:'NumpadDecimal',
+  0xe0:'ControlLeft',0xe1:'ShiftLeft',0xe2:'AltLeft',0xe3:'MetaLeft',
+  0xe4:'ControlRight',0xe5:'ShiftRight',0xe6:'AltRight',0xe7:'MetaRight',
+  0xf0:'MouseLeft',0xf1:'MouseRight',0xf2:'MouseMiddle',
+  0xf3:'MouseSide1',0xf4:'MouseSide2',
+};
+
+// Build reverse map: keyCode string → HID byte
+const CODE_TO_HID = {};
+for (const [k, v] of Object.entries(HID_TO_CODE)) CODE_TO_HID[v] = parseInt(k);
+
+const PLAYBACK_MAP = { 0:'once', 1:'hold', 2:'toggle' };
+const PLAYBACK_REV = { once:0, hold:1, toggle:2 };
+
+// ── PARSER: Roccat .dat → internal macro objects ───────────────────────────
+function parseDat(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const view  = new DataView(buffer);
+  const warns = [];
+
+  const magic = String.fromCharCode(...bytes.slice(0,8));
+  if (!magic.startsWith('ROCCAT')) throw new Error(`Not a Roccat file — magic: "${magic}"`);
+
+  // Header: ROCCAT01 (8) + version (4) + name_len BE uint32 (4) + name UTF16-BE (N) + null (2) + pad (1) + count (1) + pad (2)
+  const nameLen = view.getUint32(12, false);
+  const groupNameBytes = bytes.slice(16, 16 + nameLen);
+  const groupName = new TextDecoder('utf-16be').decode(groupNameBytes);
+
+  // Find macro markers (0x40 0x57 0x01)
+  const positions = [];
+  for (let i = 0; i < bytes.length - 2; i++) {
+    if (bytes[i]===0x40 && bytes[i+1]===0x57 && bytes[i+2]===0x01) positions.push(i);
+  }
+  if (!positions.length) throw new Error('No macros found in this file.');
+
+  // Block size = distance between consecutive markers (consistent in Roccat files)
+  const BLOCK_SIZE = positions.length > 1 ? (positions[1] - positions[0]) : 0x405b;
+
+  const macros = [];
+  positions.forEach((mPos, bi) => {
+    let o = mPos + 3;
+    const playbackRaw = view.getUint16(o, true); o += 2;
+    o += 2; // skip unk field
+
+    // Read ASCII name (null-terminated)
+    const nb = [];
+    while (o < mPos + 400 && bytes[o] !== 0) { nb.push(bytes[o]); o++; }
+    const name = new TextDecoder('ascii').decode(new Uint8Array(nb));
+    o++; // skip null
+
+    // Scan 72 zero bytes to find event count (fixed padding in both formats)
+    // Safe: just scan for first non-zero byte
+    const blockEnd = (bi + 1) * BLOCK_SIZE + positions[0]; // approx block end
+    let scan = o;
+    while (scan < bytes.length - 2 && scan < blockEnd && bytes[scan] === 0) scan++;
+
+    const count = Math.min(view.getUint16(scan, true), 256);
+    scan += 2;
+
+    const events = [];
+    for (let e = 0; e < count; e++) {
+      if (scan + 8 > bytes.length) break;
+      const kc  = bytes[scan];
+      const dir = bytes[scan+1];
+      const dly = view.getUint32(scan+4, true);
+      scan += 8;
+      const keyCode = HID_TO_CODE[kc] || `HID_0x${kc.toString(16).padStart(2,'0')}`;
+      if (!HID_TO_CODE[kc]) warns.push({ macro: name, msg: `Unknown keycode 0x${kc.toString(16)} in event ${e+1}` });
+      events.push({ kc, dir, dly, keyCode, type: dir===1 ? 'keyDown' : 'keyUp' });
+    }
+
+    const playback = PLAYBACK_MAP[playbackRaw] ?? 'once';
+    macros.push({ name, playback, playbackRaw, events, _w: warns.filter(w=>w.macro===name).length });
+  });
+
+  return { macros, groupName, warns, blockSize: BLOCK_SIZE };
+}
+
+// ── WRITER: internal macros → Swarm 2 .dat binary ─────────────────────────
+// Format confirmed identical to Roccat ROCCAT01 — same structure, fresh encode
+function buildDat(macros, groupName) {
+  // Encode group name as UTF-16 BE
+  const groupNameEnc = new Uint8Array(groupName.length * 2);
+  for (let i = 0; i < groupName.length; i++) {
+    const cp = groupName.charCodeAt(i);
+    groupNameEnc[i*2]   = (cp >> 8) & 0xff;
+    groupNameEnc[i*2+1] = cp & 0xff;
+  }
+  const nameLen = groupNameEnc.length;
+
+  // Header layout:
+  //  "ROCCAT01" (8) | version 00000001 BE (4) | nameLen BE uint32 (4) |
+  //  groupName UTF16-BE (nameLen) | 00 00 (null) | 00 (pad) | macroCount (1) | 00 00 (pad)
+  const HEADER_SIZE = 8 + 4 + 4 + nameLen + 2 + 1 + 1 + 2;  // = 22 + nameLen
+
+  // Per-block layout (matches Roccat exactly):
+  //  marker 40 57 01 (3) | playback uint16LE (2) | unk 01 00 (2) |
+  //  name ASCII (variable) | null (1) | 72 zero bytes (72) |
+  //  eventCount uint16LE (2) | events 8 bytes each | zeros to BLOCK_SIZE
+  //
+  // Event record: keycode (1) | direction (1) | pad 00 00 (2) | delayMs uint32LE (4)
+  //
+  // Block size: use 0x405b (16475) — confirmed from multi-macro Roccat files
+  const BLOCK_SIZE  = 0x405b;
+  const NAME_FIELD  = 80;  // fixed name buffer size (ASCII null-terminated, zero-padded)
+
+  const totalSize = HEADER_SIZE + macros.length * BLOCK_SIZE;
+  const buf   = new ArrayBuffer(totalSize);
+  const bytes = new Uint8Array(buf);
+  const view  = new DataView(buf);
+
+  let o = 0;
+
+  // -- File header --
+  for (const c of 'ROCCAT01') bytes[o++] = c.charCodeAt(0);
+  view.setUint32(o, 1, false); o += 4;               // version (BE)
+  view.setUint32(o, nameLen, false); o += 4;          // group name byte length (BE)
+  bytes.set(groupNameEnc, o); o += nameLen;           // group name UTF-16 BE
+  bytes[o++] = 0; bytes[o++] = 0;                     // null terminator
+  bytes[o++] = 0;                                     // pad
+  bytes[o++] = macros.length & 0xff;                  // macro count
+  bytes[o++] = 0; bytes[o++] = 0;                     // pad
+
+  // Verify header size matches expectation
+  if (o !== HEADER_SIZE) console.warn(`Header size mismatch: expected ${HEADER_SIZE}, got ${o}`);
+
+  // -- Macro blocks --
+  macros.forEach((m, bi) => {
+    const blockStart = HEADER_SIZE + bi * BLOCK_SIZE;
+    o = blockStart;
+
+    // Marker
+    bytes[o++] = 0x40; bytes[o++] = 0x57; bytes[o++] = 0x01;
+
+    // Playback (uint16 LE)
+    view.setUint16(o, m.playbackRaw ?? (PLAYBACK_REV[m.playback] ?? 0), true); o += 2;
+
+    // Unknown field (always 0x0001 in both formats)
+    view.setUint16(o, 0x0001, true); o += 2;
+
+    // Macro name: fixed 80-byte field (ASCII, null-terminated, zero-padded)
+    const nameStr = m.name.slice(0, NAME_FIELD - 1); // max 79 chars + null
+    for (const c of nameStr) bytes[o++] = c.charCodeAt(0) & 0x7f;
+    o += NAME_FIELD - nameStr.length; // advance remaining bytes (already zeroed = null+padding)
+
+    // Event count (uint16 LE)
+    view.setUint16(o, m.events.length, true); o += 2;
+
+    // Events (8 bytes each)
+    for (const ev of m.events) {
+      bytes[o++] = ev.kc;    // original HID keycode preserved exactly
+      bytes[o++] = ev.dir;   // 1=press, 2=release
+      bytes[o++] = 0; bytes[o++] = 0;          // padding
+      view.setUint32(o, ev.dly, true); o += 4; // delay ms (LE)
+    }
+
+    // Rest of block already zeroed — block ends at blockStart + BLOCK_SIZE
+  });
+
+  return buf;
+}
+
+// ── Direction state ────────────────────────────────────────────────────────
+let direction = 'to2'; // 'to2' = Swarm1→Swarm2, 'to1' = Swarm2→Swarm1
+
+const INSTRUCTIONS = {
+  to2: {
+    title: 'Swarm 1 → Swarm II',
+    steps: [
+      'In Roccat Swarm → Macro Manager → <strong>check mark</strong> a folder or macro → click the <strong>Share icon</strong> (Share Selected Macros) → save the <code>.dat</code>',
+      'Drop the file below — all macros are converted at once',
+      'In Turtle Beach Swarm II → Macro Manager → <strong>Import</strong> → select the converted <code>.dat</code>',
+    ],
+    dropTitle: 'Drop your Roccat Swarm export here',
+    dropSub:   'Roccat Swarm 1 binary <strong>.dat</strong> file',
+    suffix:    '_swarm2.dat',
+  },
+  to1: {
+    title: 'Swarm II → Swarm 1',
+    steps: [
+      'In Turtle Beach Swarm II → Macro Manager → click <strong>Export Macros</strong> → <strong>check mark</strong> a folder or macro → save the <code>.dat</code>',
+      'Drop the file below — all macros are converted at once',
+      'In Roccat Swarm → Macro Manager → click the <strong>Download icon</strong> (Load Macro Set) → select the converted <code>.dat</code>',
+    ],
+    dropTitle: 'Drop your Swarm II export here',
+    dropSub:   'Turtle Beach Swarm II binary <strong>.dat</strong> file',
+    suffix:    '_swarm1.dat',
+  },
+};
+
+function setDir(dir) {
+  direction = dir;
+  const cfg = INSTRUCTIONS[dir];
+  document.getElementById('btnTo2').classList.toggle('active', dir === 'to2');
+  document.getElementById('btnTo1').classList.toggle('active', dir === 'to1');
+  document.getElementById('infoTitle').textContent = cfg.title;
+  document.getElementById('infoSteps').innerHTML = cfg.steps.map(s => `<li>${s}</li>`).join('');
+  document.getElementById('dropTitle').textContent = cfg.dropTitle;
+  document.getElementById('dropSub').innerHTML = cfg.dropSub;
+  resetConverter();
+}
+
+// ── State ─────────────────────────────────────────────────────────────────
+let outputBuffer = null;
+let outputFilename = 'converted_swarm2.dat';
+
+// ── UI ─────────────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
+
+function processFile(file) {
+  clearError();
+  const suffix = INSTRUCTIONS[direction].suffix;
+  outputFilename = file.name.replace(/\.dat$/i, '') + suffix;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const parsed = parseDat(ev.target.result);
+      outputBuffer = buildDat(parsed.macros, parsed.groupName);
+      displayResults(parsed, file.name);
+    } catch(err) { showError(err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function displayResults({ macros, warns }) {
+  const totalEvs = macros.reduce((s,m) => s + m.events.length, 0);
+  document.getElementById('statMacros').textContent = macros.length;
+  document.getElementById('statEvents').textContent = totalEvs;
+  document.getElementById('statWarns').textContent  = warns.length;
+  document.getElementById('downloadBtn').textContent = `⬇ Download ${outputFilename}`;
+
+  const list = document.getElementById('macroList');
+  list.innerHTML = '';
+  macros.forEach(m => {
+    const card = document.createElement('div');
+    card.className = 'macro-card';
+    const evHtml = m.events.map(ev => {
+      const cls = ev.dir === 1 ? 'ev-press' : 'ev-release';
+      const sym = ev.dir === 1 ? '▼' : '▲';
+      return `<span class="${cls}">${sym} ${ev.keyCode}${ev.dly ? `  +${ev.dly}ms` : ''}</span>`;
+    }).join('');
+    card.innerHTML = `
+      <div class="macro-dot ${m._w ? 'dot-warn' : 'dot-ok'}"></div>
+      <div class="macro-info">
+        <div class="macro-name">${esc(m.name)}</div>
+        <div class="macro-meta">
+          <span class="meta-tag hl">${m.playback}</span>
+          <span class="meta-tag">${m.events.length} event${m.events.length!==1?'s':''}</span>
+          ${m._w ? `<span class="meta-tag wn">⚠ ${m._w} warn</span>` : ''}
+        </div>
+        ${m.events.length ? `<div class="macro-events">${evHtml}</div>` : ''}
+      </div>`;
+    list.appendChild(card);
+  });
+
+  const wPanel = document.getElementById('warningsPanel');
+  if (warns.length) {
+    wPanel.classList.add('visible');
+    document.getElementById('warnList').innerHTML = warns.map(w =>
+      `<div class="warn-item"><strong style="color:var(--warn);min-width:130px;font-family:ui-monospace,Consolas,'Courier New',monospace;font-size:11px">${esc(w.macro)}</strong>${esc(w.msg)}</div>`
+    ).join('');
+  }
+
+  document.getElementById('results').classList.add('visible');
+  document.getElementById('results').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function downloadDat() {
+  if (!outputBuffer) return;
+  const blob = new Blob([outputBuffer], { type: 'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = outputFilename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function resetConverter() {
+  outputBuffer = null; fileInput.value = '';
+  document.getElementById('results').classList.remove('visible');
+  document.getElementById('warningsPanel').classList.remove('visible');
+  clearError();
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function showError(msg) {
+  document.getElementById('errorMsg').textContent = msg;
+  document.getElementById('errorPanel').classList.add('visible');
+}
+
+function clearError() { document.getElementById('errorPanel').classList.remove('visible'); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>
